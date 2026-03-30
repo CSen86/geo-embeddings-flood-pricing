@@ -1,0 +1,24 @@
+# Data files (too large for version control)
+data/*.parquet
+data/*.csv
+data/*.feather
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.env
+.venv
+env/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db

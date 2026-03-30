@@ -1,0 +1,11 @@
+numpy
+pandas
+matplotlib
+torch
+statsmodels
+scikit-learn
+scipy
+requests
+tqdm
+pyarrow
+jupyter
