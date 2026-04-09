@@ -1,11 +1,11 @@
 numpy
 pandas
-matplotlib
 torch
 statsmodels
 scikit-learn
 scipy
-requests
+matplotlib
 tqdm
+requests
 pyarrow
 jupyter

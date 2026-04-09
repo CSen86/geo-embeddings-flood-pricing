@@ -1,62 +1,62 @@
-# GeoEmbeddings — Geographic Ratemaking with Spatial Embeddings
+# GeoEmbeddings — Geographic Ratemaking with Spatial CNN Embeddings
 
-### Rethinking Risk: From Tabular Variables to Spatial Signals
-
-For the modern actuary, Artificial Intelligence is often framed merely as a "faster tool" for optimization. However, the true paradigm shift lies in how AI—specifically Deep Learning—allows us to **perceive, delineate, and decompose risk**. 
-
-While traditional actuarial models like **Generalized Linear Models (GLMs)** or **Gradient Boosting Machines (GBMs)** operate by identifying relationships between discrete, predefined features, Convolutional Neural Networks (CNNs) introduce a fundamental structural shift. They treat data not as a static table, but as a **signal to be decomposed and recomposed**. 
-
-In the context of spatial risk, a CNN does not just "look" at a neighboring tract; it extracts hierarchical features—capturing textures, continuities, and gradients of socioeconomic or environmental variables. This allows for the capture of nuances that traditional distance-based kernels or fixed territorial smoothing often miss. As noted by **Blier-Wong et al. (2021)**, this approach enables the "automatic extraction of spatial features," moving from a manual craft of territory definition toward a high-dimensional, data-driven representation of geographic information.
+> Replicating and extending **Blier-Wong et al. (2021)** using Florida NFIP flood insurance data.
 
 ---
 
-## Project Overview
+## Overview
 
-This repository provides a real-data implementation of the **Blier-Wong et al. (2021)** framework, applied to Florida flood insurance risk using National Flood Insurance Program (NFIP) data.
+Traditional actuarial pricing models treat each territory as an isolated point. This project asks a different question: *what if we treat a census tract as the centre of a spatial image, and let a neural network learn what that neighbourhood looks like?*
 
-The core innovation is the construction of a **Geographic Data Square Cuboid (GDSC)**. Instead of treating a census tract as an isolated point, we treat it as the center of a local "image" of risk. By using a **CNN Autoencoder**, we learn to decompose the complex spatial fabric of Florida into a dense, 16-dimensional embedding ($z \in \mathbb{R}^{16}$) that captures the latent essence of the territory.
-
-### The Methodology
-
-1.  **Signal Construction (GDSC):** For each Florida census tract, a $7 \times 7 \times 100$ tensor is built from neighboring tracts, with each cell populated by ~100 ACS census variables.
-2.  **Spatial Decomposition (CNN Encoder):** A CNN architecture learns to recognize patterns in the spatial distribution of data, compressing the high-dimensional cuboid into a meaningful embedding.
-3.  **Actuarial Integration:** These embeddings are used to enhance a **Poisson GLM** for flood claim rate prediction, combining the predictive power of Deep Learning with the statistical rigor and interpretability required in actuarial practice.
-
-```text
-GDSC tensor (7 × 7 × ~100 census vars)
-        │
-   CNN Encoder (Feature Decomposition)
-        │
-  Embedding z ∈ ℝ¹⁶  +  Traditional features
-        │
-   Poisson GLM  →  λ̂ (claim rate)
-
-## Data Sources
-
-| File | Source | Description |
-|------|--------|-------------|
-| `claims_fl.parquet` | FEMA OpenFEMA — NFIP Redacted Claims v2 | Flood claim counts per census tract (2018–2022) |
-| `policies_fl.parquet` | FEMA OpenFEMA — NFIP Redacted Policies v2 | Policy exposure per tract |
-| `acs_fl.parquet` | U.S. Census Bureau — ACS 5-Year (2022) | ~100 socioeconomic features per tract |
-| `gaz_fl.parquet` | Census Bureau — Gazetteer Files | Tract centroids (lat/lon) |
-
-> Data files are excluded from version control (see `.gitignore`). Download instructions are in the notebook.
-
-## Project Structure
+We build a **Geographic Data Square Cuboid (GDSC)** — a 7×7×63 tensor of ACS census features arranged around each Florida census tract — then train a **CNN Autoencoder** to compress it into a 16-dimensional embedding. Those embeddings replace (and outperform) hand-crafted territorial variables in a Poisson GLM for flood claim frequency.
 
 ```
-GeoEmbeddings/
+GDSC tensor  (7 × 7 × 63 census features)
+      │
+ CNN Encoder  →  z ∈ ℝ¹⁶  (spatial embedding)
+      │
+ Poisson GLM  →  λ̂  (expected claim frequency per policy-year)
+```
+
+---
+
+## Repository Structure
+
+```
+geo-embeddings-flood-pricing/
 ├── notebooks/
-│   └── GeoEmbeddings_Florida_NFIP_GDSC.ipynb
-├── data/                   # excluded from git
-│   ├── acs_fl.parquet
-│   ├── claims_fl.parquet
-│   ├── gaz_fl.parquet
-│   └── policies_fl.parquet
+│   ├── 01_didactic_simulated.ipynb   # Self-contained walkthrough on synthetic data
+│   └── 02_florida_nfip_real_data.ipynb  # Full pipeline on real NFIP + ACS data
+├── data/
+│   └── README.md                     # How to populate (files are gitignored)
+├── docs/                             # Slides, paper drafts, figures
 ├── .gitignore
 ├── requirements.txt
 └── README.md
 ```
+
+---
+
+## Notebooks
+
+| Notebook | Purpose | Data needed |
+|----------|---------|-------------|
+| `01_didactic_simulated.ipynb` | Pedagogical walkthrough — GDSC construction, CNN autoencoder, GLM comparison — using 500 simulated tracts. Zero external downloads required. | None |
+| `02_florida_nfip_real_data.ipynb` | Full replication on 5,160 Florida census tracts. Downloads NFIP claims/policies from FEMA OpenFEMA and ACS features from the Census Bureau API. | Internet + optional Census API key |
+
+---
+
+## Key Results (Notebook 02)
+
+| Model | Features | Test MSE | vs M1 |
+|-------|----------|----------|-------|
+| M1 — Census GLM | 12 ACS covariates | 3,455 | baseline |
+| M2 — Embedding GLM | 16 CNN embeddings | 2,678 | **−22.5%** |
+| M3 — Combined GLM | Census + embeddings | 2,519 | **−27.1%** |
+
+CNN autoencoder: 193:1 compression ratio (7×7×63 = 3,087 → 16 dims), 75,727 parameters.
+
+---
 
 ## Setup
 
@@ -64,14 +64,27 @@ GeoEmbeddings/
 pip install -r requirements.txt
 ```
 
-You will also need a free **Census API key**: https://api.census.gov/data/key_signup.html
+For notebook 02, a free Census API key speeds up ACS downloads but is not required:  
+https://api.census.gov/data/key_signup.html
 
-Set it in the notebook configuration section (`CENSUS_API_KEY`). Keyless mode is supported but subject to lower rate limits.
+Set `CENSUS_API_KEY = "your_key"` in the configuration cell. Leave blank for keyless (rate-limited) mode.
 
-## Model Architecture
+---
 
-- **Grid size:** 7×7 neighbors per tract
-- **Grid step:** 3.0 km between grid points
-- **Latent dimension:** 16
-- **NFIP window:** 2018–2022 (matching ACS period)
-- **State:** Florida (FIPS 12)
+## Data Sources
+
+| Dataset | Source |
+|---------|--------|
+| NFIP Redacted Claims v2 | [FEMA OpenFEMA](https://www.fema.gov/openfema-data-page/fima-nfip-redacted-claims-v2) |
+| NFIP Redacted Policies v2 | [FEMA OpenFEMA](https://www.fema.gov/openfema-data-page/fima-nfip-redacted-policies-v2) |
+| ACS 5-Year Data Profiles (2022) | [Census Bureau API](https://api.census.gov) |
+
+Data files are excluded from version control. See `data/README.md`.
+
+---
+
+## Reference
+
+Blier-Wong, C., Cossette, H., Lamontagne, L., & Marceau, E. (2021).  
+*Machine learning in P&C insurance: A review for pricing and reserving.*  
+**ASTIN Bulletin**, 51(2), 351–378.
